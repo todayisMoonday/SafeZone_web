@@ -20,7 +20,11 @@ type RawDeviceMap = Record<string, RawDevice>;
 
 // --- Fallback dataset when MQTT can't open (dev/testing) ---
 const FALLBACK_RAW: RawDeviceMap = {
+<<<<<<< HEAD
   "1": {"battery":"40","temp":"24.6","humi":"70","status":"GOOD","lat":"37.868770","lng":"127.738360","recent_obj":["2025-05-01T23:21:52","hog","https://m.health.chosun.com/site/data/img_dir/2022/05/24/2022052402229_0.jpg"]},
+=======
+  "1": {"battery":"40","temp":"24.6","humi":"70","status":"GOOD","lat":"37.869422","lng":"127.743069","recent_obj":["2025-05-01T23:21:52","hog","https://m.health.chosun.com/site/data/img_dir/2022/05/24/2022052402229_0.jpg"]},
+>>>>>>> a38193f677509806e50b329187525c600b953a3d
   "2": {"battery":"40","temp":"24.6","humi":"70","status":"BAD","lat":"37.869436","lng":"127.742939","recent_obj":["2025-05-01T23:21:52","hog","https://thumb.mt.co.kr/06/2024/02/2024021621113371189_1.jpg/dims/optimize/"]},
   "3": {"battery":"40","temp":"24.6","humi":"70","status":"OFF","lat":"37.869562","lng":"127.742999","recent_obj":["2025-05-01T23:21:52","hog","https://newsimg.hankookilbo.com/2020/04/24/202004241244319174_1.jpg"]},
   "4": {"battery":"20","temp":"24.6","humi":"70","status":"BAD","lat":"37.869501","lng":"127.743001","recent_obj":["2025-05-01T23:21:52","hog","https://newsimg.hankookilbo.com/2020/04/24/202004241244319174_1.jpg"]},
