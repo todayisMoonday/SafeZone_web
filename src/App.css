@@ -1,0 +1,61 @@
+/* === 글로벌 리셋 & 변수 === */
+:root {
+  --ratio-w: 9;
+  --ratio-h: 19.3;
+  --bg-letterbox: #000;   /* 레터박스(남는 여백) 색 */
+  --bg-app: #fff;         /* 실제 앱 배경 */
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+html, body { margin: 0; }
+
+/* === #root: 화면 중앙 정렬, 레터박스 처리 === */
+#root {
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-letterbox);
+}
+
+/* === 고정 화면비 프레임 ===
+   뷰포트의 더 짧은 변 기준으로 자동 스케일하며 19.3:9 유지 */
+.app-frame {
+  aspect-ratio: calc(var(--ratio-w) / var(--ratio-h));
+  width: min(100vw, calc(100dvh * (var(--ratio-w) / var(--ratio-h))));
+  height: auto;
+  max-height: 100dvh;
+
+  background: var(--bg-app);
+  overflow: hidden;                /* 필요 시 auto로 변경 */
+}
+
+/* 새 래퍼: Outlet을 감싸고 내부 페이지를 꽉 채우도록 함 */
+.app-viewport {
+  height: 100%;
+  width: 100%;
+  display: block;     /* 굳이 flex 안 써도 됨 */
+  overflow: hidden;   /* 필요 시 auto로 */
+}
+
+/* 핵심: P1/P2의 '최상위 DOM 요소'에만 사이즈 강제 (소스 수정 없이) */
+.app-viewport > * {
+  inline-size: 100%;
+  block-size: 100%;
+  min-height: 100%;
+  /* 충돌 최소화를 위해 display는 건드리지 않음 */
+  /* 필요 시 스크롤: overflow:auto; */
+}
+
+/* 만약 P1/P2가 내부 스크롤을 기대한다면: 내부 자식에 공간 배분 허용 */
+.app-viewport > * > * {
+  min-height: 0;
+}
+
+/* (선택) 반응형 스케일 단위: 폰트/여백을 함께 축소/확대하고 싶을 때 */
+.app-frame {
+  --u: calc(min(100vw, calc(100dvh * (var(--ratio-w) / var(--ratio-h)))) / 100);
+  font-size: calc(var(--u) * 1.6); /* 기준 폰트 크기, 취향대로 조정 */
+}
