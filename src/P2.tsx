@@ -6,6 +6,13 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
+type DBLogData = {
+  device_id: number;
+  event_time: string;
+  detected_object: string;
+  base64_image: string;
+}
+
 // ===== Types =====
 type RawDevice = {
   battery: string;
@@ -20,7 +27,7 @@ type RawDeviceMap = Record<string, RawDevice>;
 
 // --- Fallback dataset when MQTT can't open (dev/testing) ---
 const FALLBACK_RAW: RawDeviceMap = {
-  "1": {"battery":"40","temp":"24.6","humi":"70","status":"GOOD","lat":"37.869422","lng":"127.743069","recent_obj":["2025-05-01T23:21:52","hog","https://m.health.chosun.com/site/data/img_dir/2022/05/24/2022052402229_0.jpg"]},
+  "1": {"battery":"40","temp":"24.6","humi":"70","status":"GOOD","lat":"37.868770","lng":"127.738360","recent_obj":["2025-05-01T23:21:52","hog","https://m.health.chosun.com/site/data/img_dir/2022/05/24/2022052402229_0.jpg"]},
   "2": {"battery":"40","temp":"24.6","humi":"70","status":"BAD","lat":"37.869436","lng":"127.742939","recent_obj":["2025-05-01T23:21:52","hog","https://thumb.mt.co.kr/06/2024/02/2024021621113371189_1.jpg/dims/optimize/"]},
   "3": {"battery":"40","temp":"24.6","humi":"70","status":"OFF","lat":"37.869562","lng":"127.742999","recent_obj":["2025-05-01T23:21:52","hog","https://newsimg.hankookilbo.com/2020/04/24/202004241244319174_1.jpg"]},
   "4": {"battery":"20","temp":"24.6","humi":"70","status":"BAD","lat":"37.869501","lng":"127.743001","recent_obj":["2025-05-01T23:21:52","hog","https://newsimg.hankookilbo.com/2020/04/24/202004241244319174_1.jpg"]},
@@ -118,24 +125,44 @@ const ImagePreview: React.FC<{ src: string; onClose: () => void }> = ({ src, onC
   </div>
 );
 
-/** 탐지 로그 패널 (더미 데이터) */
-const DetectionLogs: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const dummyLogs = [
-    {
-      dateLabel: "2025.09.02",
-      timeLabel: "9:00 A.M.",
-      ago: "9월 2일(토)",
-      target: "사람",
-      image: "https://picsum.photos/id/1/200/300",
-    },
-    {
-      dateLabel: "2025.09.03",
-      timeLabel: "11:30 A.M.",
-      ago: "9월 3일(일)",
-      target: "강아지",
-      image: "https://picsum.photos/id/237/200/300",
-    },
-  ];
+/** 탐지 로그 패널 (DB 데이터) */
+const DetectionLogs: React.FC<{ onClose: () => void; logs: DBLogData[]; loading: boolean }> = ({ onClose, logs, loading }) => {
+  // event_time → 화면용 라벨로 변환
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return {
+        dateLabel: iso,
+        timeLabel: "",
+        ago: "",
+      };
+    }
+
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1)
+    const dd = String(d.getUTCDate())
+
+    const week = ["일", "월", "화", "수", "목", "금", "토"];
+    const weekday = week[d.getUTCDay()];
+
+    let hh = String(d.getUTCHours());
+    let ampm = "";
+    if(hh >= "13"){
+      ampm = "P.M.";
+      hh = String(Number(hh) - 12);
+    }
+    else{
+      ampm = "A.M.";
+    }
+
+    const mi = String(d.getUTCMinutes());
+
+    return {
+      dateLabel: `${yyyy}.${mm}.${dd} (${weekday})`,
+      timeLabel: `${ampm} ${hh}시 ${mi}분`,
+      ago: "",
+    };
+  };
 
   return (
     <div
@@ -178,63 +205,80 @@ const DetectionLogs: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         - 실시간 말뚝 정보 안내
       </div>
 
-      {dummyLogs.map((log, i) => (
-        <div
-          key={i}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "132px 1fr",
-            gridAutoRows: "min-content",
-            gap: 14,
-            alignItems: "start",
-            padding: 14,
-            marginBottom: 12,
-            background: "#ffffff",
-            borderRadius: 18,
-            boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-            border: "1px solid #eef5ef",
-          }}
-        >
-          {/* 좌측 이미지 */}
-          <img
-            src={log.image}
-            alt={log.target}
-            style={{
-              width: 132,
-              height: 110,
-              borderRadius: 16,
-              objectFit: "cover",
-              objectPosition: "center",
-            }}
-          />
+      {loading && (
+        <div style={{ padding: 12, fontSize: 14, color: "#636e72" }}>
+          최근 탐지 기록을 불러오는 중입니다...
+        </div>
+      )}
 
-          {/* 우측 내용 */}
-          <div style={{ display: "grid", gap: 10 }}>
-            {/* 날짜/시간: 두 줄로 (줄바꿈 고정) */}
-            <div style={{ textAlign: "center" }}>
-              <div style={{ color: "#27ae60", fontWeight: 800 }}>
-                <div style={{ fontSize: 18, lineHeight: 1.1 }}>{log.dateLabel}</div>
-                <div style={{ fontSize: 14, opacity: 0.85, marginTop: 2 }}>{log.timeLabel}</div>
+      {!loading && logs.length === 0 && (
+        <div style={{ padding: 12, fontSize: 14, color: "#636e72" }}>
+          최근 탐지 기록이 없습니다.
+        </div>
+      )}
+
+      {!loading && logs.slice(0, 2).map((log, i) => {
+        const { dateLabel, timeLabel, ago } = fmt(log.event_time);
+
+        return (
+          <div
+            key={i}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "132px 1fr",
+              gridAutoRows: "min-content",
+              gap: 14,
+              alignItems: "start",
+              padding: 14,
+              marginBottom: 12,
+              background: "#ffffff",
+              borderRadius: 18,
+              boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+              border: "1px solid #eef5ef",
+            }}
+          >
+            {/* 좌측 이미지 */}
+            <img
+              src={log.base64_image}
+              alt={log.detected_object}
+              style={{
+                width: 132,
+                height: 110,
+                borderRadius: 16,
+                objectFit: "cover",
+                objectPosition: "center",
+              }}
+            />
+
+            {/* 우측 내용 */}
+            <div style={{ display: "grid", gap: 10 }}>
+              {/* 날짜/시간 */}
+              <div style={{ textAlign: "center" }}>
+                <div style={{ color: "#27ae60", fontWeight: 800 }}>
+                  <div style={{ fontSize: 22, lineHeight: 1.1, marginTop: 15}}>{dateLabel}</div>
+                  <div style={{ fontSize: 19, opacity: 0.85, marginTop: 3 }}>{timeLabel}</div>
+                </div>
+              </div>
+
+              {/* 경고 표시(ago는 일단 비워두거나 위 fmt에서 채우면 됨) */}
+              {ago && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", textAlign: "center" }}>
+                  <div style={{ fontSize: 23 }}>⚠️</div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: "#27ae60", whiteSpace: "nowrap"}}>{ago}</div>
+                </div>
+              )}
+
+              {/* 탐지대상 */}
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#2d3436", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center" }}>
+                탐지대상: {log.detected_object === "hog" ? "맷돼지" : log.detected_object}
               </div>
             </div>
 
-            {/* 한 줄 경고 날짜 */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", textAlign: "center" }}>
-              <div style={{ fontSize: 23 }}>⚠️</div>
-              <div style={{ fontSize: 19, fontWeight: 800, color: "#27ae60", whiteSpace: "nowrap" }}>{log.ago}</div>
-            </div>
-
-            {/* 탐지대상: 한 줄 유지 */}
-            <div style={{ fontSize: 18, fontWeight: 900, color: "#2d3436", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center" }}>
-              탐지대상: {log.target}
-            </div>
-          </div>
-
             <div
               style={{
-                gridColumn: "1 / -1",           // 두 칼럼 전체 폭 사용
+                gridColumn: "1 / -1",
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr", // 1:1 비율
+                gridTemplateColumns: "1fr 1fr",
                 width: "100%",
               }}
             >
@@ -268,7 +312,8 @@ const DetectionLogs: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </button>
             </div>
           </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -460,6 +505,36 @@ const P2: React.FC = () => {
   // Map height should adapt when bottom panel is open
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [panelHeight, setPanelHeight] = useState(0);
+  // --- DB 로그 상태 ---
+  const [logs, setLogs] = useState<DBLogData[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  // --- 최근 로그 패널 열릴 때마다 백엔드에서 로그 fetch ---
+  useEffect(() => {
+    if (!showLogs || currentId == null) return;
+
+    setLogsLoading(true);
+    setLogs([]);
+
+    fetch(`http://localhost:3001/api/alerts/recent?device_id=${currentId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("failed to load logs");
+        return res.json();
+      })
+      .then((data: DBLogData[]) => {
+        // event_time 기준 내림차순 정렬
+        const sorted = [...data].sort(
+          (a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime()
+        );
+        setLogs(sorted);
+      })
+      .catch((err) => {
+        console.error("failed to fetch logs", err);
+        setLogs([]);
+      })
+      .finally(() => {
+        setLogsLoading(false);
+      });
+  }, [showLogs, currentId]);
 
   // 3) MQTT 연결 & 요청/응답
   const clientRef = useRef<MqttClient | null>(null);
@@ -510,6 +585,7 @@ const P2: React.FC = () => {
     client.on("message", (topic, payload) => {
       try {
         const text = String(payload);
+        console.log(payload);
 
         // 1) 전체 장치표
         if (topic.startsWith("Response/")) {
@@ -535,11 +611,42 @@ const P2: React.FC = () => {
                 ] as [string, string, string]
               : undefined;
 
+          // console.log(String(msg.recent_obj[2]));
+
           if (!recentArr) return;
 
-          // Ignore alert (al debug) if device is not GOOD
-          const curStatus = rawMapRef.current?.[String(numId)]?.status;
-          if (curStatus !== "GOOD") return;
+          // 백엔드 서버로 보낼 데이터 객체를 만듭니다.
+          const alertPayload = {
+            cmd: msg.cmd,       // "alert"
+            id: numId,          // 장치 ID
+            recent_obj: recentArr // [시간, 대상, Base64 이미지]
+          };
+
+          // Node.js 백엔드 서버의 API 엔드포인트(3001번 포트)를 호출합니다.
+          fetch('http://localhost:3001/api/save-alert', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(alertPayload), // 데이터를 JSON 문자열로 변환
+          })
+          .then(response => {
+              if (response.ok) {
+                  // 성공 시 브라우저 콘솔에 로그
+                  console.log('Alert data sent to backend successfully.');
+              } else {
+                  // 실패 시 브라우저 콘솔에 오류 로그
+                  console.error('Failed to send alert data to backend. Status:', response.status);
+              }
+          })
+          .catch(error => {
+              // 네트워크 오류 등 발생 시 콘솔에 오류 로그
+              console.error('Network error while sending alert data:', error);
+          });
+
+          // // Ignore alert (al debug) if device is not GOOD
+          // const curStatus = rawMapRef.current?.[String(numId)]?.status;
+          // if (curStatus !== "GOOD") return;
           
 
           // rawMap 내 해당 id만 recent_obj 교체
@@ -685,12 +792,12 @@ const P2: React.FC = () => {
 
   const center = useMemo(() => {
     const valid = items.filter((i) => isFiniteCoord(i.lat) && isFiniteCoord(i.lng));
-    if (valid.length === 0) return { lat: 37.8695, lng: 127.7430 };
+    if (valid.length === 0) return { lat: 36.706389, lng: 127.431111 }; // <--- 좌표 수정
     const lat = valid.reduce((s, i) => s + i.lat, 0) / valid.length;
     const lng = valid.reduce((s, i) => s + i.lng, 0) / valid.length;
     return {
-      lat: Number.isFinite(lat) ? lat : 37.8695,
-      lng: Number.isFinite(lng) ? lng : 127.7430,
+      lat: Number.isFinite(lat) ? lat : 36.706389, // <--- 좌표 수정
+      lng: Number.isFinite(lng) ? lng : 127.431111, // <--- 좌표 수정
     };
   }, [items]);
 
@@ -1041,7 +1148,13 @@ const P2: React.FC = () => {
           </div>
         </div>
       )}
-      {showLogs && <DetectionLogs onClose={() => setShowLogs(false)} />}
+      {showLogs && (
+        <DetectionLogs
+          onClose={() => setShowLogs(false)}
+          logs={logs}
+          loading={logsLoading}
+        />
+      )}
       {previewSrc && <ImagePreview src={previewSrc} onClose={() => setPreviewSrc(null)} />}
       {cctvOpen && currentId && (
         <CctvOverlay

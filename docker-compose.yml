@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL 데이터베이스 서비스
+  safezone-db:
+    image: postgres:16
+    container_name: SafeZone_postgresql
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      # ⚠️ server/server.js에 설정한 값과 일치해야 합니다.
+      POSTGRES_USER: safezone_user
+      POSTGRES_PASSWORD: safezone_pass
+      POSTGRES_DB: safezone
+    volumes:
+      - safezone_data:/var/lib/postgresql/data
+      
+  # 2. Node.js 백엔드 API 서버 서비스
+  api-server:
+    build: 
+      context: ./server  # ⬅️ server 폴더를 빌드 경로로 지정
+      dockerfile: Dockerfile # ⬅️ Node 서버용 Dockerfile (다음 단계에서 생성)
+    container_name: safezone-api
+    restart: always
+    ports:
+      - "3001:3001" # ⬅️ React에서 fetch할 포트 (server.js의 포트)
+    environment:
+      # DB 접속 정보가 환경변수로 안전하게 전달됩니다.
+      DB_USER: safezone_user
+      DB_PASSWORD: safezone_pass
+      DB_HOST: safezone-db # ⬅️ Docker Compose 내부 네트워크 이름 (컨테이너 이름)
+      POSTGRES_DB: safezone
+    depends_on:
+      - safezone-db # DB가 먼저 실행되도록 보장
+
+volumes:
+  safezone_data:
+    driver: local
